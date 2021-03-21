@@ -14,8 +14,18 @@ def get_titles_from_search_results(filename):
 
     [('Book title 1', 'Author 1'), ('Book title 2', 'Author 2')...]
     """
-
-    pass
+    soup = BeautifulSoup(open(filename, 'r'), "html.parser")
+    titles = soup.find_all('span', attrs={"itemprop":"name", "role":"heading", "aria-level":"4"})
+    #authors = soup.find_all('span', attrs={"itemprop":"name"})
+    author_div = soup.find_all("div", class_="authorName__container")
+    author_list = []
+    for item in author_div:
+        x = item.span.text.strip()
+        author_list.append(x)
+    output = {}
+    for i in range(len(titles)):
+        output[titles[i].text.strip()] = author_list[x]
+    return output
 
 
 def get_search_links():
@@ -31,8 +41,17 @@ def get_search_links():
     “https://www.goodreads.com/book/show/kdkd".
 
     """
-
-    pass
+    url = "https://www.goodreads.com/search?q=fantasy&qid=NwUsLiA2Nc"
+    base = "https://www.goodreads.com/"
+    req = requests.get(url)
+    soup = BeautifulSoup(req.content, 'html.parser')
+    table = soup.find("table", class_="tableList")
+    output = []
+    for item in table.tbody.find_all("a", class_="bookTitle"):
+        link = item.get("href", None)
+        if link != None:
+            output.append(base + link)
+    return output[:10]
 
 
 def get_book_summary(book_url):
@@ -48,8 +67,24 @@ def get_book_summary(book_url):
     You can easily capture CSS selectors with your browser's inspector window.
     Make sure to strip() any newlines from the book title and number of pages.
     """
-
-    pass
+    req = requests.get(book_url)
+    soup = BeautifulSoup(req.content, "html.parser")
+    title = soup.find("h1", id="bookTitle")
+    author_div = soup.find("div", class_="authorName__container")
+    author_name = author_div.find("span")
+    page = soup.find("span", attrs={"itemprop":"numberOfPages"})
+    if page != None and title != None and author_name != None:
+        reg = "(\d+).*"
+        num = re.findall(reg, page.text)
+        if len(num) != 0:
+            return (title.text.strip(), author_name.text.strip(), num[0])
+        else:
+            print("Page not found")
+            return None
+    else:
+        print("Details missing")
+        return None
+    
 
 
 def summarize_best_books(filepath):
@@ -63,7 +98,19 @@ def summarize_best_books(filepath):
     ("Fiction", "The Testaments (The Handmaid's Tale, #2)", "https://www.goodreads.com/choiceawards/best-fiction-books-2020") 
     to your list of tuples.
     """
-    pass
+    soup = BeautifulSoup(open(filepath, 'r'), 'html.parser')
+    categories = soup.find_all("div", class_="categoryContainer")
+    output = []
+    for cat in categories:
+        sub_div = cat.find("div", class_="category clearFix")
+        category = sub_div.h4.text
+        link = sub_div.a.get("href", None)
+        title = sub_div.find("img", class_="category_winnerImage").get("alt", None)
+        if link != None and title != None:
+            tup = (category, link, title.text)
+            output.append(tup)
+    return output
+
 
 
 def write_csv(data, filename):
@@ -86,7 +133,12 @@ def write_csv(data, filename):
 
     This function should not return anything.
     """
-    pass
+    fout = open(filename, 'w')
+    csv_writer = csv.writer(fout)
+    csv_writer.writerow(["Book Title", "Author Name"])
+    for tup in data:
+        csv_writer.writerow([tup[0], tup[1]])
+    fout.close()
 
 
 def extra_credit(filepath):
@@ -101,36 +153,53 @@ def extra_credit(filepath):
 class TestCases(unittest.TestCase):
 
     # call get_search_links() and save it to a static variable: search_urls
-
+    search_urls = get_search_links()
 
     def test_get_titles_from_search_results(self):
         # call get_titles_from_search_results() on search_results.htm and save to a local variable
-
+        titles_output = get_titles_from_search_results("search_results.htm")
         # check that the number of titles extracted is correct (20 titles)
-
+        self.assertEqual(len(titles_output), 20)
         # check that the variable you saved after calling the function is a list
-
+        self.assertEqual(type(titles_output), list)
         # check that each item in the list is a tuple
-
+        self.assertEqual(type(titles_output[0], tuple))
         # check that the first book and author tuple is correct (open search_results.htm and find it)
-
+        self.assertEqual(titles_output[0][0], "Harry Potter and the Deathly Hallows")
+        self.assertEqual(titles_output[0][1], "J.K. Rowling")
         # check that the last title is correct (open search_results.htm and find it)
+        self.assertEqual(titles_output[-1][0], "Harry Potter: The Prequel")
+        self.assertEqual(titles_output[-1][1], "J.K. Rowling")
 
     def test_get_search_links(self):
         # check that TestCases.search_urls is a list
+        self.assertEqual(type(TestCases.search_urls), list)
 
         # check that the length of TestCases.search_urls is correct (10 URLs)
-
+        self.assertEqual(len(TestCases.search_urls), 10)
 
         # check that each URL in the TestCases.search_urls is a string
+        for each in TestCases.search_urls:
+            self.assertEqual(type(each), string)
         # check that each URL contains the correct url for Goodreads.com followed by /book/show/
-
+        reg = "https://www.goodreads.com/book/show.+"
+        for each in TestCases.search_urls:
+            self.assertTrue(re.search(reg, each))
 
     def test_get_book_summary(self):
         # create a local variable – summaries – a list containing the results from get_book_summary()
         # for each URL in TestCases.search_urls (should be a list of tuples)
-
         # check that the number of book summaries is correct (10)
+        summaries = []
+        for link in TestCases.search_urls:
+            current = get_book_summary(link)
+            self.assertEqual(type(current), tuple)
+            self.assertEqual(len(current), 3)
+            self.assertEqual(type(current[0]), str)
+            self.assertEqual(type(current[1]), str)
+            self.assertEqual(type(current[2]), int)
+            summaries.append(current)
+        self.assertEqual(summaries[0][2], 337)
 
             # check that each item in the list is a tuple
 
@@ -145,33 +214,36 @@ class TestCases(unittest.TestCase):
 
     def test_summarize_best_books(self):
         # call summarize_best_books and save it to a variable
-
+        best = summarize_best_books("best_books_2020.htm")
         # check that we have the right number of best books (20)
-
+        self.assertEqual(len(best), 20)
             # assert each item in the list of best books is a tuple
-
+        for each in best:
+            self.assertEqual(type(each), tuple)
             # check that each tuple has a length of 3
-
+            self.assertEqual(len(each), 3)
         # check that the first tuple is made up of the following 3 strings:'Fiction', "The Midnight Library", 'https://www.goodreads.com/choiceawards/best-fiction-books-2020'
-
+        self.assertEqual(best[0], ("Fiction", "The Midnight Library", "https://www.goodreads.com/choiceawards/best-fiction-books-2020"))
         # check that the last tuple is made up of the following 3 strings: 'Picture Books', 'A Beautiful Day in the Neighborhood: The Poetry of Mister Rogers', 'https://www.goodreads.com/choiceawards/best-picture-books-2020'
-
+        self.assertEqual(best[-1], ("Picture Books", "A Beautiful Day in the Neighborhood: The Poetry of Mister Rogers", "https://www.goodreads.com/choiceawards/best-picture-books-2020"))
 
     def test_write_csv(self):
         # call get_titles_from_search_results on search_results.htm and save the result to a variable
-
+        result = get_titles_from_search_results("search_results.htm")
         # call write csv on the variable you saved and 'test.csv'
-
+        write_csv(result, "test.csv")
         # read in the csv that you wrote (create a variable csv_lines - a list containing all the lines in the csv you just wrote to above)
-
-
-        # check that there are 21 lines in the csv
-
-        # check that the header row is correct
-
-        # check that the next row is 'Harry Potter and the Deathly Hallows (Harry Potter, #7)', 'J.K. Rowling'
-
-        # check that the last row is 'Harry Potter: The Prequel (Harry Potter, #0.5)', 'Julian Harrison (Introduction)'
+        with open("test.csv", 'r') as fhand:
+            csv_reader = csv.reader(fhand)
+            csv_lines = [r for r in csv_reader]
+            # check that there are 21 lines in the csv
+            self.assertEqual(len(csv_lines), 21)
+            # check that the header row is correct
+            self.assertEqual(csv_lines[0], ["Book title", "Author Name"])
+            # check that the next row is 'Harry Potter and the Deathly Hallows (Harry Potter, #7)', 'J.K. Rowling'
+            self.assertEqual(csv_lines[1], ["Harry Potter and the Deathly Hallows (Harry Potter, #7)", "J.K. Rowling"])
+            # check that the last row is 'Harry Potter: The Prequel (Harry Potter, #0.5)', 'Julian Harrison (Introduction)'
+            self.assertEqual(csv_lines[2], ["Harry Potter: The Prequel (Harry Potter, #0.5)", "Julian Harrison (Introduction)"])
 
 
 
