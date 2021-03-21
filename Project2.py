@@ -16,15 +16,31 @@ def get_titles_from_search_results(filename):
     """
     soup = BeautifulSoup(open(filename, 'r'), "html.parser")
     titles = soup.find_all('span', attrs={"itemprop":"name", "role":"heading", "aria-level":"4"})
-    #authors = soup.find_all('span', attrs={"itemprop":"name"})
-    author_div = soup.find_all("div", class_="authorName__container")
+    title_list = []
+    for item in titles:
+        if item.string != None:
+            title_list.append(item.string.strip())
     author_list = []
-    for item in author_div:
-        x = item.span.text.strip()
-        author_list.append(x)
+    spans = soup.find_all("span", attrs={"itemprop":"author"})
+    for span in spans:
+        #may contain multiple authors
+        all_div = span.find_all("div", class_="authorName__container")
+        author_name = ""
+        for each in all_div:
+            x = each.find_all("span")
+            f = [i.text.strip() for i in x]
+            if len(f) == 2:
+                name = f[0] + " " + f[1]
+            else:
+                name = f[0]
+            if author_name != "":
+                author_name = author_name + ", " + name
+            else:
+                author_name = name
+        author_list.append(author_name)
     output = {}
-    for i in range(len(titles)):
-        output[titles[i].text.strip()] = author_list[x]
+    for i in range(len(title_list)):
+        output[title_list[i]] = author_list[i]
     return output
 
 
@@ -43,11 +59,12 @@ def get_search_links():
     """
     url = "https://www.goodreads.com/search?q=fantasy&qid=NwUsLiA2Nc"
     base = "https://www.goodreads.com/"
+
     req = requests.get(url)
     soup = BeautifulSoup(req.content, 'html.parser')
     table = soup.find("table", class_="tableList")
     output = []
-    for item in table.tbody.find_all("a", class_="bookTitle"):
+    for item in table.find_all("a", class_="bookTitle"):
         link = item.get("href", None)
         if link != None:
             output.append(base + link)
@@ -77,14 +94,14 @@ def get_book_summary(book_url):
         reg = "(\d+).*"
         num = re.findall(reg, page.text)
         if len(num) != 0:
-            return (title.text.strip(), author_name.text.strip(), num[0])
+            return (title.text.strip(), author_name.text.strip(), int(num[0]))
         else:
             print("Page not found")
             return None
     else:
         print("Details missing")
         return None
-    
+
 
 
 def summarize_best_books(filepath):
@@ -99,15 +116,14 @@ def summarize_best_books(filepath):
     to your list of tuples.
     """
     soup = BeautifulSoup(open(filepath, 'r'), 'html.parser')
-    categories = soup.find_all("div", class_="categoryContainer")
+    categories = soup.find_all("div", class_="category clearFix")
     output = []
     for cat in categories:
-        sub_div = cat.find("div", class_="category clearFix")
-        category = sub_div.h4.text
-        link = sub_div.a.get("href", None)
-        title = sub_div.find("img", class_="category_winnerImage").get("alt", None)
+        category = cat.h4.text.strip()
+        link = cat.a.get("href", None)
+        title = cat.find("img", class_="category__winnerImage").get("alt", None)
         if link != None and title != None:
-            tup = (category, link, title.text)
+            tup = (category, link, title)
             output.append(tup)
     return output
 
@@ -163,7 +179,7 @@ class TestCases(unittest.TestCase):
         # check that the variable you saved after calling the function is a list
         self.assertEqual(type(titles_output), list)
         # check that each item in the list is a tuple
-        self.assertEqual(type(titles_output[0], tuple))
+        self.assertEqual(type(titles_output[0]), tuple)
         # check that the first book and author tuple is correct (open search_results.htm and find it)
         self.assertEqual(titles_output[0][0], "Harry Potter and the Deathly Hallows")
         self.assertEqual(titles_output[0][1], "J.K. Rowling")
@@ -180,7 +196,7 @@ class TestCases(unittest.TestCase):
 
         # check that each URL in the TestCases.search_urls is a string
         for each in TestCases.search_urls:
-            self.assertEqual(type(each), string)
+            self.assertEqual(type(each), str)
         # check that each URL contains the correct url for Goodreads.com followed by /book/show/
         reg = "https://www.goodreads.com/book/show.+"
         for each in TestCases.search_urls:
@@ -193,23 +209,18 @@ class TestCases(unittest.TestCase):
         summaries = []
         for link in TestCases.search_urls:
             current = get_book_summary(link)
+            # check that each item in the list is a tuple
             self.assertEqual(type(current), tuple)
+            # check that each tuple has 3 elements
             self.assertEqual(len(current), 3)
+            # check that the first two elements in the tuple are string
             self.assertEqual(type(current[0]), str)
             self.assertEqual(type(current[1]), str)
+            # check that the third element in the tuple, i.e. pages is an int
             self.assertEqual(type(current[2]), int)
             summaries.append(current)
+        # check that the first book in the search has 337 pages
         self.assertEqual(summaries[0][2], 337)
-
-            # check that each item in the list is a tuple
-
-            # check that each tuple has 3 elements
-
-            # check that the first two elements in the tuple are string
-
-            # check that the third element in the tuple, i.e. pages is an int
-
-            # check that the first book in the search has 337 pages
 
 
     def test_summarize_best_books(self):
@@ -250,6 +261,7 @@ class TestCases(unittest.TestCase):
 if __name__ == '__main__':
     print(extra_credit("extra_credit.htm"))
     unittest.main(verbosity=2)
+
 
 
 
