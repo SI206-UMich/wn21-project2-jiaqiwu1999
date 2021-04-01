@@ -15,28 +15,29 @@ def get_titles_from_search_results(filename):
 
     [('Book title 1', 'Author 1'), ('Book title 2', 'Author 2')...]
     """
-    soup = BeautifulSoup(open(filename, 'r'), "html.parser")
-    titles = soup.find_all('span', attrs={"itemprop":"name", "role":"heading", "aria-level":"4"})
-    title_list = []
-    for item in titles:
-        if item.string != None:
-            title_list.append(item.string.strip())
-    author_list = []
-    spans = soup.find_all("span", attrs={"itemprop":"author"})
-    for span in spans:
-        div = span.find("div", class_="authorName__container")
-        names = div.find_all("span")
-        #(Adaptation)
-        author_name = ""
-        if (len(names) == 2):
-            author_name = names[0].text.strip() + names[1].text.strip()
-        else:
-            author_name = names[0].text.strip()
-        author_list.append(author_name)
     output = []
-    for i in range(len(title_list)):
-        tup = (title_list[i], author_list[i])
-        output.append(tup)
+    with open(filename, 'r') as fopen:
+        soup = BeautifulSoup(fopen, "html.parser")
+        titles = soup.find_all('span', attrs={"itemprop":"name", "role":"heading", "aria-level":"4"})
+        title_list = []
+        for item in titles:
+            if item.string != None:
+                title_list.append(item.string.strip())
+        author_list = []
+        spans = soup.find_all("span", attrs={"itemprop":"author"})
+        for span in spans:
+            div = span.find("div", class_="authorName__container")
+            names = div.find_all("span")
+            #(Adaptation)
+            author_name = ""
+            if (len(names) == 2):
+                author_name = names[0].text.strip() + names[1].text.strip()
+            else:
+                author_name = names[0].text.strip()
+            author_list.append(author_name)
+        for i in range(len(title_list)):
+            tup = (title_list[i], author_list[i])
+            output.append(tup)
     return output
 
 
@@ -111,16 +112,17 @@ def summarize_best_books(filepath):
     ("Fiction", "The Testaments (The Handmaid's Tale, #2)", "https://www.goodreads.com/choiceawards/best-fiction-books-2020") 
     to your list of tuples.
     """
-    soup = BeautifulSoup(open(filepath, 'r'), 'html.parser')
-    categories = soup.find_all("div", class_="category clearFix")
     output = []
-    for cat in categories:
-        category = cat.h4.text.strip()
-        link = cat.a.get("href", None)
-        title = cat.find("img", class_="category__winnerImage").get("alt", None)
-        if link != None and title != None:
-            tup = (category, title, link)
-            output.append(tup)
+    with open(filepath, 'r') as fopen:
+        soup = BeautifulSoup(fopen, 'html.parser')
+        categories = soup.find_all("div", class_="category clearFix")
+        for cat in categories:
+            category = cat.h4.text.strip()
+            link = cat.a.get("href", None)
+            title = cat.find("img", class_="category__winnerImage").get("alt", None)
+            if link != None and title != None:
+                tup = (category, title, link)
+                output.append(tup)
     return output
 
 
@@ -198,7 +200,6 @@ class TestCases(unittest.TestCase):
         for each in TestCases.search_urls:
             self.assertTrue(re.search(reg, each))
 
-
     def test_get_book_summary(self):
         # create a local variable – summaries – a list containing the results from get_book_summary()
         # for each URL in TestCases.search_urls (should be a list of tuples)
@@ -217,8 +218,8 @@ class TestCases(unittest.TestCase):
             self.assertEqual(type(current[2]), int)
             summaries.append(current)
         # check that the first book in the search has 337 pages
+        self.assertEqual(len(summaries), 10)
         self.assertEqual(summaries[0][2], 337)
-
 
     def test_summarize_best_books(self):
         # call summarize_best_books and save it to a variable
